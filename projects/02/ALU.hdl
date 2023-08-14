@@ -42,5 +42,35 @@ CHIP ALU {
         ng; // 1 if (out < 0),  0 otherwise
 
     PARTS:
-   // Put you code here:
+    /* Handles zx and nx flags */
+    Mux16 (a=x, b=false, sel=zx, out=x1);
+    Not16 (in=x1, out=notx);
+    Mux16 (a=x1, b=notx, sel=nx, out=x2);
+
+    /* handles zy and ny flags */
+    Mux16 (a=y, b=false, sel=zy, out=y1);
+    Not16 (in=y1, out=noty);
+    Mux16 (a=y1, b=noty, sel=ny, out=y2);
+
+    /* handles f flag */
+    Add16 (a=x2, b=y2, out=addxy);
+    And16 (a=x2, b=y2, out=xandy);
+    Mux16 (a=xandy, b=addxy, sel=f, out=fxy);
+
+    /* handles no flag */
+    Not16 (in=fxy, out=notfxy);
+    Mux16 (a=fxy, b=notfxy, sel=no, out=out, out[0..7]=botout, out[8..15]=topout, out[15]=ng);
+    /* ng is the most signifant bit because in the two's complement representation the msb determines the sign*/
+    
+    /* Will be 1 if any bit in the bottom half of out is 1 */
+    Or8Way (in=botout, out=orbot);
+
+    /* Will be 1 if any bit in the top half of out is 1 */
+    Or8Way (in=topout, out=ortop);
+
+    /* Will be 1 if any bit in out is 1 */
+    Or (a=orbot, b=ortop, out=nzr);
+
+    /* Will be 1 if all bits in out are 0 */
+    Not (in=nzr, out=zr);
 }
