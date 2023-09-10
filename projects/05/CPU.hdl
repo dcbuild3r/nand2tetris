@@ -39,5 +39,102 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-    // Put your code here:
+    // MSB of instruction determines whether the instruction is A or C
+    // A instruction: 0xxxxxxx xxxxxxxx
+    // C instruction: 1xxxxxxx xxxxxxxx
+    Not(in=instruction[15], out=Ainstruction);
+    Not(in=Ainstruction, out=Cinstruction);
+
+    // controlA controls whether the A register will signal the previous ALU
+    // output or the instruction to be loaded into the A register
+    // @output controlA... control bit for A register
+    And(a=Cinstruction, b=instruction[5], out=controlA);
+    
+    // Multiplexor selects whether the A register will hold
+    // an instruction or the previous ALU output based on the
+    // value of controlA
+    // @output inA ... value to be loaded into A register
+    Mux16(a=instruction, b=ALUout, sel=controlA, out=inA);
+
+    // if we have an Ainstruction or we want to use the previous
+    // ALU output then we load that value into the A register
+    // otherwise the load bit will be 0 
+    // @output loadA... load bit for A register
+    Or(a=Ainstruction, b=controlA, out=loadA);
+
+    // inA will be loaded into the A register if loadA is 1
+    // otherwise the A register will keep holding its previous value
+    ARegister(in=inA, load=loadA, out=Aout);
+
+    // sel = first bit of DEST part of instruction
+    // output will be either the value of the address register
+    // or the value of the memory register at address A 
+    // @output AMout ... either inM or Aout depending on sel
+    Mux16(a=Aout, b=inM, sel=instruction[12], out=AMout);
+
+    // @output loadD ... load bit for D register 
+    And(a=Cinstruction, b=instruction[4], out=loadD);
+    
+    // @output Dout ... value to be loaded into D register
+    DRegister(in=ALUout, load=loadD, out=Dout);
+
+    // Feed all the control bits to the ALU
+    // @output ALUout ... output of the ALU
+    // @output zr ... zero bit
+    // @output ng ... negative bit
+    ALU(x=Dout, y=AMout, zx=instruction[11], nx=instruction[10], zy=instruction[9], 
+        ny=instruction[8], f=instruction[7], no=instruction[6], out=ALUout, zr=zr, ng=ng);
+
+    // @output addressM ... memory address to be written to
+    Or16(a=false, b=Aout, out[0..14]=addressM);
+
+    // @output outM ... value to be written to memory
+    Or16(a=false, b=ALUout, out=outM);
+
+    // If it's a C instruction and the a comp bit is 1 (deals with memory)
+    // then we want to write to memory
+    // @output writeM ... memory write control bit 
+    And(a=Cinstruction, b=instruction[3], out=writeM);
+
+    // if the zero bit is one and the instruction is a jump instruction
+    // then set the jump if equal control bit to 1
+    // @output jeq... jump eq control bit
+    And(a=zr, b=instruction[1], out=jeq);
+
+    // if the negative bit is one and the instruction is a jump instruction
+    // then set the jump less than control bit to 1
+    // @output jlt... jump lt control bit
+    And(a=ng, b=instruction[2], out=jlt);
+
+    // if the zero bit or the negative bit is one
+    // @output zrOrng... zero bit or negative bit
+    Or(a=zr, b=ng, out=zrOrng); 
+
+    // if not zero or negative then it's positive
+    // @output pos... positive bit
+    Not(in=zrOrng, out=pos);
+
+    // if the instruction is a jump instruction and the positive bit is 1
+    // then set the jump if greater than control bit to 1
+    // @output jgt... jump gt control bit
+    And(a=pos, b=instruction[0], out=jgt);
+
+    // if the instruction is a jeq or jlt instruction output a jle control bit
+    // @output jle... jump le control bit
+    Or(a=jeq, b=jlt, out=jle);
+
+    // if the instruction is a jle or jgt instruction output a jump to A control bit
+    // @output jumpToA... jump to A control bit
+    Or(a=jle, b=jgt, out=jumpToA);
+
+    // if the instruction is a C instruction and the jump to A control bit is 1
+    // then set the PC load control bit to 1
+    // @output PCload... PC load control bit
+    And(a=Cinstruction, b=jumpToA, out=PCload); 
+
+    // set the PC increment control bit to 1 if we are not loading
+    Not(in=PCload, out=PCinc);
+
+    // if the reset bit is 1 then set the PC to 0
+    PC(in=Aout, inc=PCinc, load=PCload, reset=reset, out[0..14]=pc);
 }
