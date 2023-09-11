@@ -1,0 +1,11 @@
+[package]
+name = "hack_assembler"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = { version = "4.4.2", features = ["derive"] }
+regex = "1.9.5"
